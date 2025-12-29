@@ -1,7 +1,6 @@
 use inquire::Select;
 use std::env;
 use std::fs;
-use std::path::PathBuf;
 use std::process;
 
 fn main() {
@@ -29,7 +28,7 @@ fn main() {
 fn setup_symlinks(choice: &str) -> std::io::Result<()> {
     let current_dir = env::current_dir()?;
     let context_commands = current_dir.join(".context/commands");
-    
+
     if !context_commands.exists() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,
@@ -45,7 +44,7 @@ fn setup_symlinks(choice: &str) -> std::io::Result<()> {
 
     // Remove existing symlink/directory if it exists
     if target.exists() || target.read_link().is_ok() {
-        if target.is_dir() && !target.read_link().is_ok() {
+        if target.is_dir() && target.read_link().is_err() {
             // It's a real directory, not a symlink - don't remove it
             return Err(std::io::Error::new(
                 std::io::ErrorKind::AlreadyExists,
