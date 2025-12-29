@@ -72,13 +72,9 @@ pub:
     echo "📦 Publishing to crates.io..."
     cargo publish
     
-    # Wait a bit for crates.io to process
-    echo "⏳ Waiting 10 seconds for crates.io to process..."
-    sleep 10
+    # Install locally immediately (don't wait for crates.io)
+    echo "💿 Installing from local source..."
+    cargo install --path . --force
     
-    # Install the new version
-    echo "💿 Installing context-driven-development@$NEW_VERSION..."
-    cargo install context-driven-development --version $NEW_VERSION --force
-    
-    echo "✅ Published and installed version $NEW_VERSION"
+    echo "✅ Published version $NEW_VERSION to crates.io and installed locally"
     echo "You can now run: cdd"
