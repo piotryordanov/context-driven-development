@@ -1,0 +1,19 @@
+[package]
+name = "context-driven-development"
+version = "0.1.0"
+edition = "2021"
+authors = ["Piotr Yordanov"]
+description = "Context-driven development installer and tooling"
+repository = "https://github.com/piotryordanov/context-driven-development"
+license = "MIT"
+
+[[bin]]
+name = "context-driven-development"
+path = "src/main.rs"
+
+[[bin]]
+name = "cdd"
+path = "src/main.rs"
+
+[dependencies]
+inquire = "0.9.1"
