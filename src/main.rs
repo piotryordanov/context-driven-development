@@ -101,10 +101,10 @@ fn setup_symlinks(choice: &str) -> std::io::Result<()> {
         ));
     }
 
-    // Create the target directory (.claude or .opencode)
-    let target_dir = match choice {
-        "Claude Code" => current_dir.join(".claude"),
-        "OpenCode" => current_dir.join(".opencode"),
+    // Determine target directory and folder name
+    let (target_dir, folder_name) = match choice {
+        "Claude Code" => (current_dir.join(".claude"), "commands"), // plural for Claude
+        "OpenCode" => (current_dir.join(".opencode"), "command"),   // singular for OpenCode
         _ => unreachable!(),
     };
 
@@ -113,29 +113,36 @@ fn setup_symlinks(choice: &str) -> std::io::Result<()> {
         fs::create_dir(&target_dir)?;
     }
 
-    // The symlink target is .claude/commands or .opencode/commands
-    let target = target_dir.join("commands");
-
-    // Remove existing symlink/directory if it exists
-    if target.exists() || target.read_link().is_ok() {
-        if target.is_dir() && target.read_link().is_err() {
-            // It's a real directory, not a symlink - don't remove it
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::AlreadyExists,
-                format!("{} already exists as a directory. Please remove it manually if you want to replace it with a symlink.", target.display())
-            ));
-        } else {
-            // It's a symlink or broken symlink, remove it
-            let _ = fs::remove_file(&target);
-        }
+    // Create the commands/command folder
+    let target_commands_dir = target_dir.join(folder_name);
+    if !target_commands_dir.exists() {
+        fs::create_dir(&target_commands_dir)?;
     }
 
-    // Create symlink: .claude/commands -> .context/_reference/commands
-    #[cfg(unix)]
-    std::os::unix::fs::symlink(&context_commands, &target)?;
+    // Copy all command files from .context/_reference/commands to target
+    for entry in fs::read_dir(&context_commands)? {
+        let entry = entry?;
+        let source_path = entry.path();
 
-    #[cfg(windows)]
-    std::os::windows::fs::symlink_dir(&context_commands, &target)?;
+        // Skip if not a file
+        if !source_path.is_file() {
+            continue;
+        }
+
+        // Get the filename
+        let filename = match source_path.file_name() {
+            Some(name) => name,
+            None => continue,
+        };
+
+        // Copy to target directory
+        let target_path = target_commands_dir.join(filename);
+
+        // Only copy if file doesn't exist (don't overwrite user's custom commands)
+        if !target_path.exists() {
+            fs::copy(&source_path, &target_path)?;
+        }
+    }
 
     Ok(())
 }
