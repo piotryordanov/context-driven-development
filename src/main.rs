@@ -12,6 +12,33 @@ static CONTEXT_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/.context");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
+    // Check for commands
+    let args: Vec<String> = env::args().collect();
+    if args.len() > 1 {
+        match args[1].as_str() {
+            "uninstall" => {
+                if let Err(e) = uninstall() {
+                    eprintln!("Error during uninstall: {}", e);
+                    process::exit(1);
+                }
+                return;
+            }
+            "--version" | "-v" => {
+                println!("cdd (context-driven-development) {}", VERSION);
+                return;
+            }
+            "--help" | "-h" => {
+                print_help();
+                return;
+            }
+            _ => {
+                eprintln!("Unknown command: {}", args[1]);
+                eprintln!("Run 'cdd --help' for usage information.");
+                process::exit(1);
+            }
+        }
+    }
+
     let options = vec!["Claude Code", "OpenCode"];
 
     let answer = Select::new("Choose your development environment:", options)
@@ -39,6 +66,74 @@ fn main() {
             process::exit(1);
         }
     }
+}
+
+fn print_help() {
+    println!("cdd (context-driven-development) {}", VERSION);
+    println!();
+    println!("USAGE:");
+    println!("    cdd [COMMAND]");
+    println!();
+    println!("COMMANDS:");
+    println!("    (no args)          Interactive setup - choose Claude Code or OpenCode");
+    println!("    uninstall          Remove CDD files from current directory");
+    println!("    --version, -v      Print version information");
+    println!("    --help, -h         Print this help message");
+    println!();
+    println!("DESCRIPTION:");
+    println!("    Sets up context-driven development environment by:");
+    println!("    - Extracting .context/_reference files");
+    println!("    - Copying command files to .claude/commands or .opencode/command");
+    println!();
+    println!("EXAMPLES:");
+    println!("    cdd                # Interactive setup");
+    println!("    cdd uninstall      # Remove CDD files");
+    println!("    cdd --version      # Show version");
+}
+
+fn uninstall() -> std::io::Result<()> {
+    let current_dir = env::current_dir()?;
+
+    println!("🗑️  Uninstalling CDD files...");
+
+    // List of paths to remove
+    let paths_to_remove = vec![
+        current_dir.join(".context"),
+        current_dir.join(".claude"),
+        current_dir.join(".opencode"),
+    ];
+
+    let mut removed_count = 0;
+
+    for path in paths_to_remove {
+        if path.exists() {
+            let path_name = path.file_name().unwrap().to_string_lossy();
+            if path.is_dir() {
+                fs::remove_dir_all(&path)?;
+                println!("  ✓ Removed {}/", path_name);
+                removed_count += 1;
+            } else {
+                fs::remove_file(&path)?;
+                println!("  ✓ Removed {}", path_name);
+                removed_count += 1;
+            }
+        }
+    }
+
+    if removed_count == 0 {
+        println!("  No CDD files found to remove.");
+    } else {
+        println!(
+            "\n✅ Uninstall complete! Removed {} item(s).",
+            removed_count
+        );
+        println!("Note: This only removed CDD files from the current directory.");
+        println!(
+            "To uninstall the cdd binary itself, run: cargo uninstall context-driven-development"
+        );
+    }
+
+    Ok(())
 }
 
 fn ensure_context_extracted() -> std::io::Result<()> {
