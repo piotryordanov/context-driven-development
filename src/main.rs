@@ -92,16 +92,20 @@ fn extract_dir(dir: &Dir, target_path: &Path) -> std::io::Result<()> {
 
 fn setup_symlinks(choice: &str) -> std::io::Result<()> {
     let current_dir = env::current_dir()?;
-    let context_commands = current_dir.join(".context/_reference/commands");
+    let source_reference = current_dir.join(".context/_reference");
+    let target_reference = current_dir.join(".context/_reference");
 
-    if !context_commands.exists() {
+    if !source_reference.exists() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,
-            ".context/_reference/commands directory not found after extraction.",
+            ".context/_reference directory not found after extraction.",
         ));
     }
 
-    // Determine target directory and folder name
+    // Copy .context/_reference to user's .context/_reference (preserving existing files)
+    copy_dir_recursive(&source_reference, &target_reference)?;
+
+    // Determine target directory and folder name for commands
     let (target_dir, folder_name) = match choice {
         "Claude Code" => (current_dir.join(".claude"), "commands"), // plural for Claude
         "OpenCode" => (current_dir.join(".opencode"), "command"),   // singular for OpenCode
@@ -120,6 +124,7 @@ fn setup_symlinks(choice: &str) -> std::io::Result<()> {
     }
 
     // Copy all command files from .context/_reference/commands to target
+    let context_commands = current_dir.join(".context/_reference/commands");
     for entry in fs::read_dir(&context_commands)? {
         let entry = entry?;
         let source_path = entry.path();
@@ -141,6 +146,36 @@ fn setup_symlinks(choice: &str) -> std::io::Result<()> {
         // Only copy if file doesn't exist (don't overwrite user's custom commands)
         if !target_path.exists() {
             fs::copy(&source_path, &target_path)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn copy_dir_recursive(source: &Path, target: &Path) -> std::io::Result<()> {
+    // Create target directory if it doesn't exist
+    if !target.exists() {
+        fs::create_dir_all(target)?;
+    }
+
+    // Copy all files and subdirectories
+    for entry in fs::read_dir(source)? {
+        let entry = entry?;
+        let source_path = entry.path();
+        let filename = match source_path.file_name() {
+            Some(name) => name,
+            None => continue,
+        };
+        let target_path = target.join(filename);
+
+        if source_path.is_dir() {
+            // Recursively copy subdirectory
+            copy_dir_recursive(&source_path, &target_path)?;
+        } else if source_path.is_file() {
+            // Only copy if file doesn't exist (don't overwrite user's files)
+            if !target_path.exists() {
+                fs::copy(&source_path, &target_path)?;
+            }
         }
     }
 
