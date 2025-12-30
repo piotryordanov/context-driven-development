@@ -19,6 +19,7 @@ import 'justfiles/dev/clippy.just'
 import 'justfiles/dev/check.just'
 import 'justfiles/dev/ci.just'
 import 'justfiles/dev/dev.just'
+import 'justfiles/dev/uninstall.just'
 
 # ============================================================================
 # Build Commands
@@ -55,6 +56,7 @@ help:
     @echo "  just \033[0;33mclippy\033[0m               \033[0;32mRun clippy linter\033[0m"
     @echo "  just \033[0;33mcheck\033[0m                \033[0;32mCheck code without building\033[0m"
     @echo "  just \033[0;33mci\033[0m                   \033[0;32mRun all CI checks (fmt, clippy, test)\033[0m"
+    @echo "  just \033[0;33muninstall\033[0m            \033[0;32mUninstall cdd binary from system\033[0m"
     @echo ""
     @echo "\033[1;35m🏗️  Build:\033[0m"
     @echo "  just \033[0;33mbuild\033[0m                \033[0;32mBuild in release mode\033[0m"
