@@ -92,12 +92,12 @@ fn extract_dir(dir: &Dir, target_path: &Path) -> std::io::Result<()> {
 
 fn setup_symlinks(choice: &str) -> std::io::Result<()> {
     let current_dir = env::current_dir()?;
-    let context_commands = current_dir.join(".context/commands");
+    let context_commands = current_dir.join(".context/_reference/commands");
 
     if !context_commands.exists() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,
-            ".context/commands directory not found after extraction.",
+            ".context/_reference/commands directory not found after extraction.",
         ));
     }
 
