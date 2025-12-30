@@ -5,8 +5,8 @@ use std::fs;
 use std::path::Path;
 use std::process;
 
-// Embed the .context directory at compile time
-static CONTEXT_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/.context");
+// Embed the .context/_reference directory at compile time
+static REFERENCE_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/.context/_reference");
 
 // Get the current package version
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -175,15 +175,8 @@ fn ensure_context_extracted() -> std::io::Result<()> {
 }
 
 fn extract_reference_from_embedded(target_path: &Path) -> std::io::Result<()> {
-    // Find _reference in the embedded CONTEXT_DIR
-    if let Some(reference_dir) = CONTEXT_DIR.get_dir("_reference") {
-        extract_dir(reference_dir, target_path)?;
-    } else {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "_reference directory not found in embedded .context",
-        ));
-    }
+    // Extract the embedded _reference directory directly
+    extract_dir(&REFERENCE_DIR, target_path)?;
     Ok(())
 }
 
