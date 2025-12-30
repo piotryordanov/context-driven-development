@@ -14,58 +14,87 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 fn main() {
     // Check for commands
     let args: Vec<String> = env::args().collect();
+
+    // Parse arguments for profile flag and commands
+    let mut profile: Option<&str> = None;
+
     if args.len() > 1 {
-        match args[1].as_str() {
-            "uninstall" => {
-                if let Err(e) = uninstall() {
-                    eprintln!("Error during uninstall: {}", e);
+        let mut i = 1;
+        while i < args.len() {
+            match args[i].as_str() {
+                "-p" | "--profile" => {
+                    if i + 1 < args.len() {
+                        let profile_arg = args[i + 1].to_lowercase();
+                        profile = match profile_arg.as_str() {
+                            "claude" | "claudecode" | "claude-code" => Some("Claude Code"),
+                            "opencode" | "open-code" => Some("OpenCode"),
+                            _ => {
+                                eprintln!("Error: Unknown profile '{}'", args[i + 1]);
+                                eprintln!("Valid profiles: claude, opencode");
+                                process::exit(1);
+                            }
+                        };
+                        i += 2;
+                    } else {
+                        eprintln!("Error: --profile requires a value");
+                        eprintln!("Usage: cdd --profile <claude|opencode>");
+                        process::exit(1);
+                    }
+                }
+                "uninstall" | "rm" | "remove" => {
+                    if let Err(e) = uninstall() {
+                        eprintln!("Error during uninstall: {}", e);
+                        process::exit(1);
+                    }
+                    return;
+                }
+                "--version" | "-v" => {
+                    println!("cdd (context-driven-development) {}", VERSION);
+                    return;
+                }
+                "--help" | "-h" => {
+                    print_help();
+                    return;
+                }
+                _ => {
+                    eprintln!("Unknown command: {}", args[i]);
+                    eprintln!("Run 'cdd --help' for usage information.");
                     process::exit(1);
                 }
-                return;
-            }
-            "--version" | "-v" => {
-                println!("cdd (context-driven-development) {}", VERSION);
-                return;
-            }
-            "--help" | "-h" => {
-                print_help();
-                return;
-            }
-            _ => {
-                eprintln!("Unknown command: {}", args[1]);
-                eprintln!("Run 'cdd --help' for usage information.");
-                process::exit(1);
             }
         }
     }
 
-    let options = vec!["Claude Code", "OpenCode"];
-
-    let answer = Select::new("Choose your development environment:", options)
-        .with_help_message("")
-        .prompt();
-
-    match answer {
-        Ok(choice) => {
-            // Ensure .context is extracted and up-to-date
-            if let Err(e) = ensure_context_extracted() {
-                eprintln!("Error setting up .context: {}", e);
+    // Get choice - either from profile flag or interactive prompt
+    let choice = if let Some(profile_choice) = profile {
+        profile_choice
+    } else {
+        let options = vec!["Claude Code", "OpenCode"];
+        match Select::new("Choose your development environment:", options)
+            .without_help_message()
+            .prompt()
+        {
+            Ok(choice) => choice,
+            Err(_) => {
+                eprintln!("Selection cancelled.");
                 process::exit(1);
             }
-
-            // Create symlinks
-            if let Err(e) = setup_symlinks(choice) {
-                eprintln!("Error setting up symlinks: {}", e);
-                process::exit(1);
-            }
-
-            println!("\n✓ Setup complete for {}", choice);
         }
-        Err(_) => {
-            eprintln!("Selection cancelled.");
-            process::exit(1);
-        }
+    };
+
+    // Ensure .context is extracted and up-to-date
+    if let Err(e) = ensure_context_extracted() {
+        eprintln!("Error setting up .context: {}", e);
+        process::exit(1);
     }
+
+    // Create symlinks
+    if let Err(e) = setup_symlinks(choice) {
+        eprintln!("Error setting up symlinks: {}", e);
+        process::exit(1);
+    }
+
+    println!("\n✓ Setup complete for {}", choice);
 }
 
 fn print_help() {
@@ -75,19 +104,19 @@ fn print_help() {
     println!("    cdd [COMMAND]");
     println!();
     println!("COMMANDS:");
-    println!("    (no args)          Interactive setup - choose Claude Code or OpenCode");
-    println!("    uninstall          Remove CDD files from current directory");
-    println!("    --version, -v      Print version information");
-    println!("    --help, -h         Print this help message");
+    println!("    (no args)                Interactive setup - choose Claude Code or OpenCode");
+    println!("    uninstall, rm, remove    Remove CDD files from current directory");
+    println!("    --version, -v            Print version information");
+    println!("    --help, -h               Print this help message");
     println!();
     println!("DESCRIPTION:");
-    println!("    Sets up context-driven development environment by:");
-    println!("    - Extracting .context/_reference files");
-    println!("    - Copying command files to .claude/commands or .opencode/command");
+    println!("    A tool to help you take your context-driven development to the next level.");
     println!();
     println!("EXAMPLES:");
     println!("    cdd                # Interactive setup");
     println!("    cdd uninstall      # Remove CDD files");
+    println!("    cdd rm             # Same as uninstall");
+    println!("    cdd remove         # Same as uninstall");
     println!("    cdd --version      # Show version");
 }
 
@@ -184,18 +213,23 @@ fn extract_dir(dir: &Dir, target_path: &Path) -> std::io::Result<()> {
     // Create the target directory
     fs::create_dir_all(target_path)?;
 
-    // Extract all files
+    // Extract all files (only files directly in this directory, not subdirectories)
     for file in dir.files() {
-        let file_path = target_path.join(file.path());
-        if let Some(parent) = file_path.parent() {
-            fs::create_dir_all(parent)?;
-        }
+        // Get just the filename, not the full path
+        let file_name = file.path().file_name().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid file name")
+        })?;
+        let file_path = target_path.join(file_name);
         fs::write(&file_path, file.contents())?;
     }
 
     // Recursively extract subdirectories
     for subdir in dir.dirs() {
-        let subdir_path = target_path.join(subdir.path());
+        // Get just the directory name, not the full path
+        let dir_name = subdir.path().file_name().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid directory name")
+        })?;
+        let subdir_path = target_path.join(dir_name);
         extract_dir(subdir, &subdir_path)?;
     }
 
@@ -204,19 +238,19 @@ fn extract_dir(dir: &Dir, target_path: &Path) -> std::io::Result<()> {
 
 fn setup_symlinks(choice: &str) -> std::io::Result<()> {
     let current_dir = env::current_dir()?;
-    let context_commands = current_dir.join(".context/_reference/commands");
+    let reference_dir = current_dir.join(".context/_reference");
 
-    if !context_commands.exists() {
+    if !reference_dir.exists() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,
-            ".context/_reference/commands directory not found after extraction.",
+            ".context/_reference directory not found after extraction.",
         ));
     }
 
-    // Determine target directory and folder name for commands
-    let (target_dir, folder_name) = match choice {
-        "Claude Code" => (current_dir.join(".claude"), "commands"), // plural for Claude
-        "OpenCode" => (current_dir.join(".opencode"), "command"),   // singular for OpenCode
+    // Determine target directory
+    let target_dir = match choice {
+        "Claude Code" => current_dir.join(".claude"),
+        "OpenCode" => current_dir.join(".opencode"),
         _ => unreachable!(),
     };
 
@@ -225,34 +259,45 @@ fn setup_symlinks(choice: &str) -> std::io::Result<()> {
         fs::create_dir(&target_dir)?;
     }
 
-    // Create the commands/command folder
-    let target_commands_dir = target_dir.join(folder_name);
-    if !target_commands_dir.exists() {
-        fs::create_dir(&target_commands_dir)?;
+    // Copy only rules and templates (NOT commands)
+    let folders_to_copy = vec!["rules", "templates"];
+
+    for folder in folders_to_copy {
+        let source_folder = reference_dir.join(folder);
+        let target_folder = target_dir.join(folder);
+
+        if source_folder.exists() {
+            copy_directory_contents(&source_folder, &target_folder)?;
+        }
     }
 
-    // Copy all command files from .context/_reference/commands to target
-    for entry in fs::read_dir(&context_commands)? {
+    Ok(())
+}
+
+fn copy_directory_contents(source: &Path, target: &Path) -> std::io::Result<()> {
+    // Create target directory if it doesn't exist
+    if !target.exists() {
+        fs::create_dir_all(target)?;
+    }
+
+    // Copy all files and subdirectories
+    for entry in fs::read_dir(source)? {
         let entry = entry?;
         let source_path = entry.path();
-
-        // Skip if not a file
-        if !source_path.is_file() {
-            continue;
-        }
-
-        // Get the filename
         let filename = match source_path.file_name() {
             Some(name) => name,
             None => continue,
         };
+        let target_path = target.join(filename);
 
-        // Copy to target directory
-        let target_path = target_commands_dir.join(filename);
-
-        // Only copy if file doesn't exist (don't overwrite user's custom commands)
-        if !target_path.exists() {
-            fs::copy(&source_path, &target_path)?;
+        if source_path.is_dir() {
+            // Recursively copy subdirectory
+            copy_directory_contents(&source_path, &target_path)?;
+        } else if source_path.is_file() {
+            // Only copy if file doesn't exist (don't overwrite user's files)
+            if !target_path.exists() {
+                fs::copy(&source_path, &target_path)?;
+            }
         }
     }
 
