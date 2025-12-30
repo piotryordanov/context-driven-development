@@ -47,7 +47,7 @@ fn ensure_context_extracted() -> std::io::Result<()> {
     let version_file = context_path.join(".version");
 
     // Check if we need to extract/update
-    let needs_extraction = if !context_path.exists() || !version_file.exists() {
+    let needs_extraction = if !version_file.exists() {
         true // First time or no version file
     } else {
         // Compare versions
@@ -59,12 +59,36 @@ fn ensure_context_extracted() -> std::io::Result<()> {
     };
 
     if needs_extraction {
-        println!("📦 Extracting .context files (version {})...", VERSION);
-        extract_dir(&CONTEXT_DIR, &context_path)?;
+        println!(
+            "📦 Extracting .context/_reference files (version {})...",
+            VERSION
+        );
+
+        // Create .context directory if it doesn't exist
+        fs::create_dir_all(&context_path)?;
+
+        // Extract only _reference from embedded .context
+        let reference_path = context_path.join("_reference");
+        extract_reference_from_embedded(&reference_path)?;
+
+        // Write version file
         fs::write(&version_file, VERSION)?;
-        println!("✓ Extracted .context files");
+        println!("✓ Extracted .context/_reference files");
     }
 
+    Ok(())
+}
+
+fn extract_reference_from_embedded(target_path: &Path) -> std::io::Result<()> {
+    // Find _reference in the embedded CONTEXT_DIR
+    if let Some(reference_dir) = CONTEXT_DIR.get_dir("_reference") {
+        extract_dir(reference_dir, target_path)?;
+    } else {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "_reference directory not found in embedded .context",
+        ));
+    }
     Ok(())
 }
 
@@ -92,18 +116,14 @@ fn extract_dir(dir: &Dir, target_path: &Path) -> std::io::Result<()> {
 
 fn setup_symlinks(choice: &str) -> std::io::Result<()> {
     let current_dir = env::current_dir()?;
-    let source_reference = current_dir.join(".context/_reference");
-    let target_reference = current_dir.join(".context/_reference");
+    let context_commands = current_dir.join(".context/_reference/commands");
 
-    if !source_reference.exists() {
+    if !context_commands.exists() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,
-            ".context/_reference directory not found after extraction.",
+            ".context/_reference/commands directory not found after extraction.",
         ));
     }
-
-    // Copy .context/_reference to user's .context/_reference (preserving existing files)
-    copy_dir_recursive(&source_reference, &target_reference)?;
 
     // Determine target directory and folder name for commands
     let (target_dir, folder_name) = match choice {
@@ -124,7 +144,6 @@ fn setup_symlinks(choice: &str) -> std::io::Result<()> {
     }
 
     // Copy all command files from .context/_reference/commands to target
-    let context_commands = current_dir.join(".context/_reference/commands");
     for entry in fs::read_dir(&context_commands)? {
         let entry = entry?;
         let source_path = entry.path();
@@ -146,36 +165,6 @@ fn setup_symlinks(choice: &str) -> std::io::Result<()> {
         // Only copy if file doesn't exist (don't overwrite user's custom commands)
         if !target_path.exists() {
             fs::copy(&source_path, &target_path)?;
-        }
-    }
-
-    Ok(())
-}
-
-fn copy_dir_recursive(source: &Path, target: &Path) -> std::io::Result<()> {
-    // Create target directory if it doesn't exist
-    if !target.exists() {
-        fs::create_dir_all(target)?;
-    }
-
-    // Copy all files and subdirectories
-    for entry in fs::read_dir(source)? {
-        let entry = entry?;
-        let source_path = entry.path();
-        let filename = match source_path.file_name() {
-            Some(name) => name,
-            None => continue,
-        };
-        let target_path = target.join(filename);
-
-        if source_path.is_dir() {
-            // Recursively copy subdirectory
-            copy_dir_recursive(&source_path, &target_path)?;
-        } else if source_path.is_file() {
-            // Only copy if file doesn't exist (don't overwrite user's files)
-            if !target_path.exists() {
-                fs::copy(&source_path, &target_path)?;
-            }
         }
     }
 
