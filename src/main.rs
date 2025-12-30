@@ -125,26 +125,39 @@ fn uninstall() -> std::io::Result<()> {
 
     println!("🗑️  Uninstalling CDD files...");
 
-    // List of paths to remove
-    let paths_to_remove = vec![
-        current_dir.join(".context"),
-        current_dir.join(".claude"),
-        current_dir.join(".opencode"),
-    ];
-
     let mut removed_count = 0;
 
-    for path in paths_to_remove {
-        if path.exists() {
-            let path_name = path.file_name().unwrap().to_string_lossy();
-            if path.is_dir() {
-                fs::remove_dir_all(&path)?;
-                println!("  ✓ Removed {}/", path_name);
-                removed_count += 1;
-            } else {
-                fs::remove_file(&path)?;
-                println!("  ✓ Removed {}", path_name);
-                removed_count += 1;
+    // Remove .context directory completely
+    let context_path = current_dir.join(".context");
+    if context_path.exists() {
+        fs::remove_dir_all(&context_path)?;
+        println!("  ✓ Removed .context/");
+        removed_count += 1;
+    }
+
+    // Remove command folders from .claude and .opencode
+    let profile_configs = vec![
+        (current_dir.join(".claude"), vec!["commands"]),
+        (current_dir.join(".opencode"), vec!["command"]),
+    ];
+
+    for (profile_dir, folders) in profile_configs {
+        if profile_dir.exists() {
+            let profile_name = profile_dir.file_name().unwrap().to_string_lossy();
+
+            for folder in folders {
+                let folder_path = profile_dir.join(folder);
+                if folder_path.exists() {
+                    fs::remove_dir_all(&folder_path)?;
+                    println!("  ✓ Removed {}/{}/", profile_name, folder);
+                    removed_count += 1;
+                }
+            }
+
+            // Check if profile directory is now empty, if so remove it
+            if profile_dir.read_dir()?.next().is_none() {
+                fs::remove_dir(&profile_dir)?;
+                println!("  ✓ Removed {}/ (was empty)", profile_name);
             }
         }
     }
@@ -204,12 +217,16 @@ fn ensure_context_extracted() -> std::io::Result<()> {
 }
 
 fn extract_reference_from_embedded(target_path: &Path) -> std::io::Result<()> {
-    // Extract the embedded _reference directory directly
-    extract_dir(&REFERENCE_DIR, target_path)?;
+    // Extract only rules and templates from _reference, skip commands
+    extract_dir_selective(&REFERENCE_DIR, target_path, &["rules", "templates"])?;
     Ok(())
 }
 
-fn extract_dir(dir: &Dir, target_path: &Path) -> std::io::Result<()> {
+fn extract_dir_selective(
+    dir: &Dir,
+    target_path: &Path,
+    allowed_dirs: &[&str],
+) -> std::io::Result<()> {
     // Create the target directory
     fs::create_dir_all(target_path)?;
 
@@ -223,14 +240,45 @@ fn extract_dir(dir: &Dir, target_path: &Path) -> std::io::Result<()> {
         fs::write(&file_path, file.contents())?;
     }
 
-    // Recursively extract subdirectories
+    // Recursively extract subdirectories (only if in allowed list)
     for subdir in dir.dirs() {
         // Get just the directory name, not the full path
         let dir_name = subdir.path().file_name().ok_or_else(|| {
             std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid directory name")
         })?;
+
+        let dir_name_str = dir_name.to_str().unwrap_or("");
+
+        // Only extract if in allowed list
+        if allowed_dirs.contains(&dir_name_str) {
+            let subdir_path = target_path.join(dir_name);
+            extract_dir_all(subdir, &subdir_path)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn extract_dir_all(dir: &Dir, target_path: &Path) -> std::io::Result<()> {
+    // Create the target directory
+    fs::create_dir_all(target_path)?;
+
+    // Extract all files
+    for file in dir.files() {
+        let file_name = file.path().file_name().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid file name")
+        })?;
+        let file_path = target_path.join(file_name);
+        fs::write(&file_path, file.contents())?;
+    }
+
+    // Recursively extract all subdirectories
+    for subdir in dir.dirs() {
+        let dir_name = subdir.path().file_name().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid directory name")
+        })?;
         let subdir_path = target_path.join(dir_name);
-        extract_dir(subdir, &subdir_path)?;
+        extract_dir_all(subdir, &subdir_path)?;
     }
 
     Ok(())
@@ -247,10 +295,10 @@ fn setup_symlinks(choice: &str) -> std::io::Result<()> {
         ));
     }
 
-    // Determine target directory
-    let target_dir = match choice {
-        "Claude Code" => current_dir.join(".claude"),
-        "OpenCode" => current_dir.join(".opencode"),
+    // Determine target directory and command folder name
+    let (target_dir, command_folder) = match choice {
+        "Claude Code" => (current_dir.join(".claude"), "commands"), // plural
+        "OpenCode" => (current_dir.join(".opencode"), "command"),   // singular
         _ => unreachable!(),
     };
 
@@ -259,44 +307,21 @@ fn setup_symlinks(choice: &str) -> std::io::Result<()> {
         fs::create_dir(&target_dir)?;
     }
 
-    // Copy only rules and templates (NOT commands)
-    let folders_to_copy = vec!["rules", "templates"];
+    // Copy commands from embedded REFERENCE_DIR to .claude/commands or .opencode/command
+    if let Some(commands_dir) = REFERENCE_DIR.get_dir("commands") {
+        let target_commands_dir = target_dir.join(command_folder);
+        fs::create_dir_all(&target_commands_dir)?;
 
-    for folder in folders_to_copy {
-        let source_folder = reference_dir.join(folder);
-        let target_folder = target_dir.join(folder);
+        // Copy all command files
+        for file in commands_dir.files() {
+            let file_name = file.path().file_name().ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid file name")
+            })?;
+            let target_path = target_commands_dir.join(file_name);
 
-        if source_folder.exists() {
-            copy_directory_contents(&source_folder, &target_folder)?;
-        }
-    }
-
-    Ok(())
-}
-
-fn copy_directory_contents(source: &Path, target: &Path) -> std::io::Result<()> {
-    // Create target directory if it doesn't exist
-    if !target.exists() {
-        fs::create_dir_all(target)?;
-    }
-
-    // Copy all files and subdirectories
-    for entry in fs::read_dir(source)? {
-        let entry = entry?;
-        let source_path = entry.path();
-        let filename = match source_path.file_name() {
-            Some(name) => name,
-            None => continue,
-        };
-        let target_path = target.join(filename);
-
-        if source_path.is_dir() {
-            // Recursively copy subdirectory
-            copy_directory_contents(&source_path, &target_path)?;
-        } else if source_path.is_file() {
-            // Only copy if file doesn't exist (don't overwrite user's files)
+            // Only copy if file doesn't exist (don't overwrite user's custom commands)
             if !target_path.exists() {
-                fs::copy(&source_path, &target_path)?;
+                fs::write(&target_path, file.contents())?;
             }
         }
     }
