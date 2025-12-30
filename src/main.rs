@@ -101,11 +101,20 @@ fn setup_symlinks(choice: &str) -> std::io::Result<()> {
         ));
     }
 
-    let target = match choice {
+    // Create the target directory (.claude or .opencode)
+    let target_dir = match choice {
         "Claude Code" => current_dir.join(".claude"),
         "OpenCode" => current_dir.join(".opencode"),
         _ => unreachable!(),
     };
+
+    // Create target directory if it doesn't exist
+    if !target_dir.exists() {
+        fs::create_dir(&target_dir)?;
+    }
+
+    // The symlink target is .claude/commands or .opencode/commands
+    let target = target_dir.join("commands");
 
     // Remove existing symlink/directory if it exists
     if target.exists() || target.read_link().is_ok() {
@@ -121,7 +130,7 @@ fn setup_symlinks(choice: &str) -> std::io::Result<()> {
         }
     }
 
-    // Create symlink
+    // Create symlink: .claude/commands -> .context/_reference/commands
     #[cfg(unix)]
     std::os::unix::fs::symlink(&context_commands, &target)?;
 
