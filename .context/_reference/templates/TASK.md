@@ -7,6 +7,9 @@ updated: "YYYY-MM-DD"  # Optional: Last modification date
 ---
 
 <!-- 
+FILE NAMING: The task file should be named: TASK_XXX-brief-description.md
+Example: TASK_001-add-user-authentication.md, TASK_042-fix-login-bug.md
+
 NOTE: This is a task specification, not implementation.
 - Describe WHAT to build, not HOW
 - NO code snippets - code belongs in the codebase
