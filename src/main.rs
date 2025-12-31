@@ -427,12 +427,33 @@ fn run_task() -> std::io::Result<()> {
                 let task_path = tasks_dir.join(&selected_file);
 
                 // Launch the appropriate tool with the selected task
-                println!("🚀 Launching {} with task: {}", profile_name, selected_file);
-                println!("   Task file: {}", task_path.display());
+                println!(
+                    "\n🚀 Launching {} with task: {}",
+                    profile_name, selected_file
+                );
+                println!("   Task file: {}\n", task_path.display());
 
+                // Read task content to pass as initial message
+                let task_content = match fs::read_to_string(&task_path) {
+                    Ok(content) => content,
+                    Err(e) => {
+                        eprintln!("Error reading task file: {}", e);
+                        process::exit(1);
+                    }
+                };
+
+                // Create the initial message
+                let message = format!(
+                    "I want to work on this task:\n\nFile: {}\n\n{}",
+                    task_path.display(),
+                    task_content
+                );
+
+                // Launch with 'run' command and the message
                 let status = process::Command::new(command_name)
                     .current_dir(&current_dir)
-                    .arg(&task_path)
+                    .arg("run")
+                    .arg(&message)
                     .status();
 
                 match status {
@@ -447,8 +468,12 @@ fn run_task() -> std::io::Result<()> {
                     Err(e) => {
                         eprintln!("Error launching {}: {}", command_name, e);
                         eprintln!("Make sure {} is installed and in your PATH.", command_name);
-                        eprintln!("\nYou can manually open the task file:");
-                        eprintln!("  {} {}", command_name, task_path.display());
+                        eprintln!("\nYou can manually run:");
+                        eprintln!(
+                            "  {} run \"Work on task: {}\"",
+                            command_name,
+                            task_path.display()
+                        );
                         process::exit(1);
                     }
                 }
