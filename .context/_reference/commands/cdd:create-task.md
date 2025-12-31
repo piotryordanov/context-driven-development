@@ -35,10 +35,10 @@ You are creating a new task specification following the TASK.md template format.
    - Lessons Learned section (EMPTY - will be filled after implementation)
    - Validation section (must include `just dev` and `just test` commands)
 
-5. **Save Location**: Save the file to the appropriate location based on the project structure in `.context/`
-   - Pattern: `.context/{project-folder}/{project-id}/TASK_{id}-{slug}.md`
-   - Example: `.context/nexus-core/CORE_001-backend-crate/TASK_005-implement-auth.md`
-   - If no complex project structure exists, save to: `.context/tasks/TASK_{id}-{slug}.md`
+5. **Save Location**: Save all task files to `.context/tasks/`
+   - Pattern: `.context/tasks/TASK_{id}-{slug}.md`
+   - Example: `.context/tasks/TASK_001-add-user-auth.md`
+   - The `.context/tasks/` directory is created during CDD initialization
 
 ---
 

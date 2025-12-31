@@ -208,6 +208,10 @@ fn ensure_context_extracted() -> std::io::Result<()> {
         let reference_path = context_path.join("_reference");
         extract_reference_from_embedded(&reference_path)?;
 
+        // Create .context/tasks directory for task files
+        let tasks_path = context_path.join("tasks");
+        fs::create_dir_all(&tasks_path)?;
+
         // Write version file
         fs::write(&version_file, VERSION)?;
         println!("✓ Extracted .context/_reference files");
