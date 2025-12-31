@@ -452,12 +452,15 @@ fn run_task() -> std::io::Result<()> {
 
                 // Different invocation for opencode vs claude
                 let status = if command_name == "opencode" {
-                    // Use user's default model from OpenCode settings
-                    process::Command::new(command_name)
-                        .current_dir(&current_dir)
-                        .arg("--prompt")
-                        .arg(&prompt)
-                        .status()
+                    // Try to use user's last used model from OpenCode
+                    let mut cmd = process::Command::new(command_name);
+                    cmd.current_dir(&current_dir);
+
+                    if let Some(model) = get_opencode_last_model() {
+                        cmd.arg("--model").arg(&model);
+                    }
+
+                    cmd.arg("--prompt").arg(&prompt).status()
                 } else {
                     // claude just takes the prompt as an argument
                     process::Command::new(command_name)
@@ -489,4 +492,27 @@ fn run_task() -> std::io::Result<()> {
     }
 
     Ok(())
+}
+
+fn get_opencode_last_model() -> Option<String> {
+    // OpenCode stores recent models in ~/.local/state/opencode/model.json
+    let state_file = dirs::home_dir()?.join(".local/state/opencode/model.json");
+
+    if !state_file.exists() {
+        return None;
+    }
+
+    // Read and parse the JSON file
+    let content = fs::read_to_string(&state_file).ok()?;
+    let json: serde_json::Value = serde_json::from_str(&content).ok()?;
+
+    // Get the first item from the "recent" array
+    let recent = json.get("recent")?.as_array()?;
+    let last_model = recent.first()?;
+
+    // Extract providerID and modelID
+    let provider_id = last_model.get("providerID")?.as_str()?;
+    let model_id = last_model.get("modelID")?.as_str()?;
+
+    Some(format!("{}/{}", provider_id, model_id))
 }
