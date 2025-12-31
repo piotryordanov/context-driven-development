@@ -1,6 +1,6 @@
 [package]
 name = "context-driven-development"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 authors = ["Piotr Yordanov"]
 description = "Context-driven development installer and tooling"
