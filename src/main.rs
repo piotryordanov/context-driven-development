@@ -428,9 +428,11 @@ fn run_task() -> std::io::Result<()> {
 
                 // Launch the appropriate tool with the selected task
                 println!("🚀 Launching {} with task: {}", profile_name, selected_file);
+                println!("   Task file: {}", task_path.display());
 
                 let status = process::Command::new(command_name)
-                    .arg(task_path.display().to_string())
+                    .current_dir(&current_dir)
+                    .arg(&task_path)
                     .status();
 
                 match status {
@@ -445,7 +447,8 @@ fn run_task() -> std::io::Result<()> {
                     Err(e) => {
                         eprintln!("Error launching {}: {}", command_name, e);
                         eprintln!("Make sure {} is installed and in your PATH.", command_name);
-                        eprintln!("\nTask file location: {}", task_path.display());
+                        eprintln!("\nYou can manually open the task file:");
+                        eprintln!("  {} {}", command_name, task_path.display());
                         process::exit(1);
                     }
                 }
