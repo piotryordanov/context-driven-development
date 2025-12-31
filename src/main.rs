@@ -454,6 +454,8 @@ fn run_task() -> std::io::Result<()> {
                 let status = if command_name == "opencode" {
                     process::Command::new(command_name)
                         .current_dir(&current_dir)
+                        .arg("--model")
+                        .arg("anthropic/claude-3-5-sonnet-20241022")
                         .arg("--prompt")
                         .arg(&prompt)
                         .status()
