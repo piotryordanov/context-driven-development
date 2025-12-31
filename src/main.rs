@@ -426,14 +426,12 @@ fn run_task() -> std::io::Result<()> {
                 let selected_file = item.output().to_string();
                 let task_path = tasks_dir.join(&selected_file);
 
-                // Launch the appropriate tool with the selected task
-                println!(
-                    "\n🚀 Launching {} with task: {}",
-                    profile_name, selected_file
-                );
-                println!("   Task file: {}\n", task_path.display());
+                // Display task information
+                println!("\n{}", "=".repeat(80));
+                println!("📋 Selected Task: {}", selected_file);
+                println!("{}", "=".repeat(80));
 
-                // Read task content to pass as initial message
+                // Read and display task content
                 let task_content = match fs::read_to_string(&task_path) {
                     Ok(content) => content,
                     Err(e) => {
@@ -442,18 +440,16 @@ fn run_task() -> std::io::Result<()> {
                     }
                 };
 
-                // Create the initial message
-                let message = format!(
-                    "I want to work on this task:\n\nFile: {}\n\n{}",
-                    task_path.display(),
-                    task_content
-                );
+                println!("{}", task_content);
+                println!("{}", "=".repeat(80));
 
-                // Launch with 'run' command and the message
+                // Launch the appropriate tool
+                println!("\n🚀 Launching {}...", profile_name);
+                println!("💡 Task file: {}", task_path.display());
+                println!();
+
                 let status = process::Command::new(command_name)
                     .current_dir(&current_dir)
-                    .arg("run")
-                    .arg(&message)
                     .status();
 
                 match status {
@@ -468,12 +464,6 @@ fn run_task() -> std::io::Result<()> {
                     Err(e) => {
                         eprintln!("Error launching {}: {}", command_name, e);
                         eprintln!("Make sure {} is installed and in your PATH.", command_name);
-                        eprintln!("\nYou can manually run:");
-                        eprintln!(
-                            "  {} run \"Work on task: {}\"",
-                            command_name,
-                            task_path.display()
-                        );
                         process::exit(1);
                     }
                 }
