@@ -47,7 +47,7 @@ You are creating a new task specification following the TASK.md template format.
 When asking users questions, use this standardized format:
 
 ```
-**Question [N]**: <question text>
+**Question [N/TOTAL]**: <question text>
 
 **Recommended:** Option [X] - <1-2 sentence reasoning why this is best>
 
@@ -61,6 +61,11 @@ When asking users questions, use this standardized format:
 You can reply with: option letter (e.g., "B"), "yes"/"recommended" to accept, or your own short answer.
 ```
 
+**Examples:**
+- `**Question [1/4]**: What should the task ID be?`
+- `**Question [2/4]**: What is the task title?`
+- `**Question [3/4]**: Which project does this belong to?`
+
 **Response Parsing Rules:**
 
 - `"yes"`, `"recommended"`, `"suggested"` → Use recommended option
@@ -70,6 +75,8 @@ You can reply with: option letter (e.g., "B"), "yes"/"recommended" to accept, or
 
 **Best Practices:**
 
+- Always show question count in format `[N/TOTAL]` (e.g., `[1/4]`, `[2/4]`)
+- Calculate TOTAL upfront based on required information
 - Ask as many questions as needed to gather complete information
 - Provide smart defaults as "Recommended" with reasoning
 - Offer clear options in table format
