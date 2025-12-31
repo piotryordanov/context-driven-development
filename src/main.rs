@@ -455,7 +455,7 @@ fn run_task() -> std::io::Result<()> {
                     process::Command::new(command_name)
                         .current_dir(&current_dir)
                         .arg("--model")
-                        .arg("anthropic/claude-3-5-sonnet-20241022")
+                        .arg("anthropic/claude-sonnet-4-5-20250514")
                         .arg("--prompt")
                         .arg(&prompt)
                         .status()
