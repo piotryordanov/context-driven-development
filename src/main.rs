@@ -183,39 +183,27 @@ fn ensure_context_extracted() -> std::io::Result<()> {
     let context_path = current_dir.join(".context");
     let version_file = context_path.join(".version");
 
-    // Check if we need to extract/update
-    let needs_extraction = if !version_file.exists() {
-        true // First time or no version file
-    } else {
-        // Compare versions
-        let existing_version = fs::read_to_string(&version_file)
-            .unwrap_or_default()
-            .trim()
-            .to_string();
-        existing_version != VERSION
-    };
+    // Always extract _reference to ensure it's up-to-date
+    // This allows users to get latest rules and templates on every run
+    println!(
+        "📦 Extracting .context/_reference files (version {})...",
+        VERSION
+    );
 
-    if needs_extraction {
-        println!(
-            "📦 Extracting .context/_reference files (version {})...",
-            VERSION
-        );
+    // Create .context directory if it doesn't exist
+    fs::create_dir_all(&context_path)?;
 
-        // Create .context directory if it doesn't exist
-        fs::create_dir_all(&context_path)?;
+    // Extract only _reference from embedded .context (overwrites existing)
+    let reference_path = context_path.join("_reference");
+    extract_reference_from_embedded(&reference_path)?;
 
-        // Extract only _reference from embedded .context
-        let reference_path = context_path.join("_reference");
-        extract_reference_from_embedded(&reference_path)?;
+    // Create .context/tasks directory for task files (if doesn't exist)
+    let tasks_path = context_path.join("tasks");
+    fs::create_dir_all(&tasks_path)?;
 
-        // Create .context/tasks directory for task files
-        let tasks_path = context_path.join("tasks");
-        fs::create_dir_all(&tasks_path)?;
-
-        // Write version file
-        fs::write(&version_file, VERSION)?;
-        println!("✓ Extracted .context/_reference files");
-    }
+    // Write version file
+    fs::write(&version_file, VERSION)?;
+    println!("✓ Extracted .context/_reference files");
 
     Ok(())
 }
