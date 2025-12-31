@@ -91,12 +91,28 @@ project/
    - Simply use the auto-incremented ID when creating the file
    - You can mention it: "I'll create this as TASK_003" but never ask about it
 
-3. **Identify Applicable Rules**:
-   - Based on your understanding of the task, analyze which rules from `.context/_reference/rules/` apply
-   - Check available rule files (e.g., `rs.md`, `justfiles.md`, etc.)
-   - Example: If building Rust code, `rs.md` rules apply
-   - Example: If creating build commands, `justfiles.md` rules apply
-   - Inform the user which rules you're applying and why
+3. **Identify Applicable Rules (Ask for Confirmation)**:
+   - Scan `.context/_reference/rules/` to see what rule files exist
+   - Based on your understanding of the task, identify which rules might apply
+   - **ASK THE USER** using standardized question format:
+     - List the rules you think apply
+     - Explain WHY you think each rule applies
+     - Ask user to confirm or modify the selection
+   - Example question format:
+     ```
+     **Question [1/N]**: Which rules should apply to this task?
+     
+     **Recommended:** Options A and B - This is a Rust project that involves build configuration
+     
+     | Option | Description |
+     |--------|-------------|
+     | A | rs.md - Rust code organization and best practices |
+     | B | justfiles.md - Build command conventions |
+     | C | Different combination (specify which rules) |
+     | Short | Specify rule files (≤5 words) |
+     ```
+   - Wait for user confirmation before proceeding
+   - DO NOT assume rules - always ask for confirmation
 
 4. **Gather Remaining Information** (ONLY if needed):
    - Use the standardized question format (see Appendix A) ONLY for information you couldn't infer
