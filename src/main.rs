@@ -452,10 +452,9 @@ fn run_task() -> std::io::Result<()> {
 
                 // Different invocation for opencode vs claude
                 let status = if command_name == "opencode" {
+                    // Use user's default model from OpenCode settings
                     process::Command::new(command_name)
                         .current_dir(&current_dir)
-                        .arg("--model")
-                        .arg("anthropic/claude-sonnet-4-5-20250514")
                         .arg("--prompt")
                         .arg(&prompt)
                         .status()
