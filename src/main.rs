@@ -1,7 +1,9 @@
 use include_dir::{include_dir, Dir};
 use inquire::Select;
+use skim::prelude::*;
 use std::env;
 use std::fs;
+use std::io::Cursor;
 use std::path::Path;
 use std::process;
 
@@ -40,6 +42,13 @@ fn main() {
                         eprintln!("Usage: cdd --profile <claude|opencode>");
                         process::exit(1);
                     }
+                }
+                "run" => {
+                    if let Err(e) = run_task() {
+                        eprintln!("Error running task selector: {}", e);
+                        process::exit(1);
+                    }
+                    return;
                 }
                 "uninstall" | "rm" | "remove" => {
                     if let Err(e) = uninstall() {
@@ -105,6 +114,7 @@ fn print_help() {
     println!();
     println!("COMMANDS:");
     println!("    (no args)                Interactive setup - choose Claude Code or OpenCode");
+    println!("    run                      Fuzzy find and select a task from .context/tasks/");
     println!("    uninstall, rm, remove    Remove CDD files from current directory");
     println!("    --version, -v            Print version information");
     println!("    --help, -h               Print this help message");
@@ -307,6 +317,87 @@ fn copy_commands(choice: &str) -> std::io::Result<()> {
             if !target_path.exists() {
                 fs::write(&target_path, file.contents())?;
             }
+        }
+    }
+
+    Ok(())
+}
+
+fn run_task() -> std::io::Result<()> {
+    let current_dir = env::current_dir()?;
+    let tasks_dir = current_dir.join(".context/tasks");
+
+    // Check if tasks directory exists
+    if !tasks_dir.exists() {
+        eprintln!("Error: .context/tasks/ directory not found.");
+        eprintln!("Run 'cdd' first to initialize the project.");
+        process::exit(1);
+    }
+
+    // Collect all task files
+    let mut task_files: Vec<String> = Vec::new();
+    for entry in fs::read_dir(&tasks_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_file() && path.extension().is_some_and(|ext| ext == "md") {
+            if let Some(file_name) = path.file_name() {
+                task_files.push(file_name.to_string_lossy().to_string());
+            }
+        }
+    }
+
+    if task_files.is_empty() {
+        println!("No tasks found in .context/tasks/");
+        println!("Tasks will appear here after you create them.");
+        return Ok(());
+    }
+
+    // Sort task files
+    task_files.sort();
+
+    // Create input for skim
+    let input = task_files.join(
+        "
+",
+    );
+
+    // Configure skim options with preview
+    let options = SkimOptionsBuilder::default()
+        .height(Some("50%"))
+        .multi(false)
+        .preview(Some("cat .context/tasks/{}"))
+        .preview_window(Some("right:60%:wrap"))
+        .prompt(Some("Select a task: "))
+        .build()
+        .unwrap();
+
+    // Run skim
+    let item_reader = SkimItemReader::default();
+    let items = item_reader.of_bufread(Cursor::new(input));
+
+    let selected_items = Skim::run_with(&options, Some(items));
+
+    match selected_items {
+        Some(out) if !out.is_abort => {
+            if let Some(item) = out.selected_items.first() {
+                let selected_file = item.output().to_string();
+                let task_path = tasks_dir.join(&selected_file);
+
+                // Read and display the task file
+                println!(
+                    "
+{}",
+                    "=".repeat(80)
+                );
+                println!("Selected: {}", selected_file);
+                println!("{}", "=".repeat(80));
+                let content = fs::read_to_string(&task_path)?;
+                println!("{}", content);
+                println!("{}", "=".repeat(80));
+            }
+        }
+        _ => {
+            println!("Selection cancelled.");
         }
     }
 
