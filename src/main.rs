@@ -426,12 +426,7 @@ fn run_task() -> std::io::Result<()> {
                 let selected_file = item.output().to_string();
                 let task_path = tasks_dir.join(&selected_file);
 
-                // Display task information
-                println!("\n{}", "=".repeat(80));
-                println!("📋 Selected Task: {}", selected_file);
-                println!("{}", "=".repeat(80));
-
-                // Read and display task content
+                // Read task content
                 let task_content = match fs::read_to_string(&task_path) {
                     Ok(content) => content,
                     Err(e) => {
@@ -440,17 +435,35 @@ fn run_task() -> std::io::Result<()> {
                     }
                 };
 
-                println!("{}", task_content);
-                println!("{}", "=".repeat(80));
+                // Create the prompt with task content
+                let prompt = format!(
+                    "I want to work on this task:\n\nFile: {}\n\n{}",
+                    task_path.display(),
+                    task_content
+                );
 
-                // Launch the appropriate tool
-                println!("\n🚀 Launching {}...", profile_name);
+                // Launch the appropriate tool with prompt
+                println!(
+                    "\n🚀 Launching {} with task: {}",
+                    profile_name, selected_file
+                );
                 println!("💡 Task file: {}", task_path.display());
                 println!();
 
-                let status = process::Command::new(command_name)
-                    .current_dir(&current_dir)
-                    .status();
+                // Different invocation for opencode vs claude
+                let status = if command_name == "opencode" {
+                    process::Command::new(command_name)
+                        .current_dir(&current_dir)
+                        .arg("--prompt")
+                        .arg(&prompt)
+                        .status()
+                } else {
+                    // claude just takes the prompt as an argument
+                    process::Command::new(command_name)
+                        .current_dir(&current_dir)
+                        .arg(&prompt)
+                        .status()
+                };
 
                 match status {
                     Ok(exit_status) => {
