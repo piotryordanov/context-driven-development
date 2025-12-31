@@ -14,11 +14,11 @@ static REFERENCE_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/.context/_referenc
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
-    // Check for commands
     let args: Vec<String> = env::args().collect();
 
-    // Parse arguments for profile flag and commands
+    // Parse arguments
     let mut profile: Option<&str> = None;
+    let mut command: Option<String> = None;
 
     if args.len() > 1 {
         let mut i = 1;
@@ -39,16 +39,13 @@ fn main() {
                         i += 2;
                     } else {
                         eprintln!("Error: --profile requires a value");
-                        eprintln!("Usage: cdd --profile <claude|opencode>");
+                        eprintln!("Usage: cdd install --profile <claude|opencode>");
                         process::exit(1);
                     }
                 }
-                "run" => {
-                    if let Err(e) = run_task() {
-                        eprintln!("Error running task selector: {}", e);
-                        process::exit(1);
-                    }
-                    return;
+                "install" | "setup" => {
+                    command = Some("install".to_string());
+                    i += 1;
                 }
                 "uninstall" | "rm" | "remove" => {
                     if let Err(e) = uninstall() {
@@ -74,6 +71,20 @@ fn main() {
         }
     }
 
+    // If install/setup command, run installation
+    if command.as_deref() == Some("install") {
+        install(profile);
+        return;
+    }
+
+    // Default: run task selector
+    if let Err(e) = run_task() {
+        eprintln!("Error running task selector: {}", e);
+        process::exit(1);
+    }
+}
+
+fn install(profile: Option<&str>) {
     // Get choice - either from profile flag or interactive prompt
     let choice = if let Some(profile_choice) = profile {
         profile_choice
@@ -110,24 +121,28 @@ fn print_help() {
     println!("cdd (context-driven-development) {}", VERSION);
     println!();
     println!("USAGE:");
-    println!("    cdd [COMMAND]");
+    println!("    cdd [COMMAND] [OPTIONS]");
     println!();
     println!("COMMANDS:");
-    println!("    (no args)                Interactive setup - choose Claude Code or OpenCode");
-    println!("    run                      Fuzzy find and select a task from .context/tasks/");
+    println!("    (no args)                Fuzzy find and select a task (default)");
+    println!("    install, setup           Install/setup CDD in current directory");
     println!("    uninstall, rm, remove    Remove CDD files from current directory");
     println!("    --version, -v            Print version information");
     println!("    --help, -h               Print this help message");
+    println!();
+    println!("OPTIONS:");
+    println!("    -p, --profile <PROFILE>  Specify profile: claude or opencode");
     println!();
     println!("DESCRIPTION:");
     println!("    A tool to help you take your context-driven development to the next level.");
     println!();
     println!("EXAMPLES:");
-    println!("    cdd                # Interactive setup");
-    println!("    cdd uninstall      # Remove CDD files");
-    println!("    cdd rm             # Same as uninstall");
-    println!("    cdd remove         # Same as uninstall");
-    println!("    cdd --version      # Show version");
+    println!("    cdd                      # Run task selector (default)");
+    println!("    cdd install              # Interactive install - choose profile");
+    println!("    cdd install -p opencode  # Install with OpenCode profile");
+    println!("    cdd install -p claude    # Install with Claude Code profile");
+    println!("    cdd uninstall            # Remove CDD files");
+    println!("    cdd --version            # Show version");
 }
 
 fn uninstall() -> std::io::Result<()> {
@@ -334,6 +349,20 @@ fn run_task() -> std::io::Result<()> {
         process::exit(1);
     }
 
+    // Detect which profile is set up
+    let claude_exists = current_dir.join(".claude/commands").exists();
+    let opencode_exists = current_dir.join(".opencode/command").exists();
+
+    let (profile_name, command_name) = if opencode_exists {
+        ("OpenCode", "opencode")
+    } else if claude_exists {
+        ("Claude Code", "claude")
+    } else {
+        eprintln!("Error: Neither .claude/commands nor .opencode/command found.");
+        eprintln!("Run 'cdd' first to initialize the project.");
+        process::exit(1);
+    };
+
     // Collect all task files
     let mut task_files: Vec<String> = Vec::new();
     for entry in fs::read_dir(&tasks_dir)? {
@@ -363,10 +392,16 @@ fn run_task() -> std::io::Result<()> {
 
     // Get absolute path to tasks directory for preview
     let tasks_dir_abs = tasks_dir.canonicalize().unwrap_or(tasks_dir.clone());
+    let task_path_template = tasks_dir_abs.join("{}").display().to_string();
+
+    // Platform-specific preview command
+    #[cfg(windows)]
+    let preview_cmd = format!("type {}", task_path_template);
+
+    #[cfg(not(windows))]
     let preview_cmd = format!(
-        "bat --color=always --style=plain {} || cat {}",
-        tasks_dir_abs.join("{}").display(),
-        tasks_dir_abs.join("{}").display()
+        "bat --color=always --style=plain {} 2>/dev/null || cat {}",
+        task_path_template, task_path_template
     );
 
     // Configure skim options with preview
@@ -391,17 +426,29 @@ fn run_task() -> std::io::Result<()> {
                 let selected_file = item.output().to_string();
                 let task_path = tasks_dir.join(&selected_file);
 
-                // Read and display the task file
-                println!(
-                    "
-{}",
-                    "=".repeat(80)
-                );
-                println!("Selected: {}", selected_file);
-                println!("{}", "=".repeat(80));
-                let content = fs::read_to_string(&task_path)?;
-                println!("{}", content);
-                println!("{}", "=".repeat(80));
+                // Launch the appropriate tool with the selected task
+                println!("🚀 Launching {} with task: {}", profile_name, selected_file);
+
+                let status = process::Command::new(command_name)
+                    .arg(task_path.display().to_string())
+                    .status();
+
+                match status {
+                    Ok(exit_status) => {
+                        if !exit_status.success() {
+                            eprintln!(
+                                "Warning: {} exited with status: {}",
+                                command_name, exit_status
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Error launching {}: {}", command_name, e);
+                        eprintln!("Make sure {} is installed and in your PATH.", command_name);
+                        eprintln!("\nTask file location: {}", task_path.display());
+                        process::exit(1);
+                    }
+                }
             }
         }
         _ => {
