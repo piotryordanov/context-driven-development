@@ -8,20 +8,28 @@ You are creating a new task specification following the TASK.md template format.
 
 ## Instructions
 
-**CRITICAL: Start by understanding what the user wants to accomplish. Do NOT jump straight into asking questions.**
+**CRITICAL RULES:**
+1. **NEVER ASK FOR TASK ID** - You determine it automatically by scanning `.context/tasks/`
+2. **START WITH UNDERSTANDING** - First message should ask what the task is about, NOT jump into questions
+3. **CONVERSATION FIRST** - Have a conversation to understand the task before asking structured questions
 
-1. **Understand the Task First**:
+### Workflow:
+
+1. **First Message - Ask What The Task Is About**:
+   - Your FIRST message to the user must be: "What are you trying to accomplish with this task?"
    - Read what the user wrote when invoking the command
-   - If the user described their goal clearly, acknowledge it and proceed
+   - If they already described their goal clearly, acknowledge it: "I understand you want to [paraphrase their goal]. Let me ask a few clarifying questions..."
    - If unclear or insufficient detail, ask: "Can you tell me more about what you're trying to accomplish?"
    - Have a conversation to fully understand the context and requirements
    - DO NOT ask structured questions until you understand the task
 
-2. **Auto-determine Task ID**:
+2. **Auto-determine Task ID (SILENT - No Question)**:
    - Check `.context/tasks/` directory for existing tasks
-   - Find the highest TASK_XXX number (e.g., if TASK_003 exists, next is TASK_004)
+   - Find the highest TASK_XXX number (e.g., if TASK_002 exists, next is TASK_003)
    - If no tasks exist, start with TASK_001
-   - NEVER ask the user for the task ID - always auto-increment
+   - **ABSOLUTELY NEVER ASK THE USER FOR THE TASK ID** - This is 100% automatic
+   - Simply use the auto-incremented ID when creating the file
+   - You can mention it: "I'll create this as TASK_003" but never ask about it
 
 3. **Identify Applicable Rules**:
    - Based on your understanding of the task, analyze which rules from `.context/_reference/rules/` apply
