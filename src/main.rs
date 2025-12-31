@@ -361,11 +361,19 @@ fn run_task() -> std::io::Result<()> {
 ",
     );
 
+    // Get absolute path to tasks directory for preview
+    let tasks_dir_abs = tasks_dir.canonicalize().unwrap_or(tasks_dir.clone());
+    let preview_cmd = format!(
+        "bat --color=always --style=plain {} || cat {}",
+        tasks_dir_abs.join("{}").display(),
+        tasks_dir_abs.join("{}").display()
+    );
+
     // Configure skim options with preview
     let options = SkimOptionsBuilder::default()
         .height(Some("50%"))
         .multi(false)
-        .preview(Some("cat .context/tasks/{}"))
+        .preview(Some(&preview_cmd))
         .preview_window(Some("right:60%:wrap"))
         .prompt(Some("Select a task: "))
         .build()
