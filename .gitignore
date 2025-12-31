@@ -1,1 +1,5 @@
 target
+
+# Directories created by cdd install
+.claude/
+.opencode/
