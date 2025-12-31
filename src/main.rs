@@ -88,9 +88,9 @@ fn main() {
         process::exit(1);
     }
 
-    // Create symlinks
-    if let Err(e) = setup_symlinks(choice) {
-        eprintln!("Error setting up symlinks: {}", e);
+    // Copy command files to profile directory
+    if let Err(e) = copy_commands(choice) {
+        eprintln!("Error copying commands: {}", e);
         process::exit(1);
     }
 
@@ -288,16 +288,8 @@ fn extract_dir_all(dir: &Dir, target_path: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-fn setup_symlinks(choice: &str) -> std::io::Result<()> {
+fn copy_commands(choice: &str) -> std::io::Result<()> {
     let current_dir = env::current_dir()?;
-    let reference_dir = current_dir.join(".context/_reference");
-
-    if !reference_dir.exists() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            ".context/_reference directory not found after extraction.",
-        ));
-    }
 
     // Determine target directory and command folder name
     let (target_dir, command_folder) = match choice {
