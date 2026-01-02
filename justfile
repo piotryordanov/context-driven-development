@@ -35,6 +35,11 @@ import 'justfiles/release/version.just'
 import 'justfiles/release/pub.just'
 
 # ============================================================================
+# Demo Commands
+# ============================================================================
+import 'justfiles/demo/demo.just'
+
+# ============================================================================
 # Help Command
 # ============================================================================
 
@@ -66,6 +71,12 @@ help:
     @echo "\033[1;35m📦 Release:\033[0m"
     @echo "  just \033[0;33mversion\033[0m              \033[0;32mShow current version\033[0m"
     @echo "  just \033[0;33mpub\033[0m                  \033[0;32mBump version, publish to crates.io, and install\033[0m"
+    @echo ""
+    @echo "\033[1;35m📹 Demo:\033[0m"
+    @echo "  just \033[0;33mdemo-info\033[0m            \033[0;32mShow demo recording information\033[0m"
+    @echo "  just \033[0;33mdemo-script\033[0m          \033[0;32mRecord an automated scripted demo\033[0m"
+    @echo "  just \033[0;33mdemo-replay\033[0m          \033[0;32mReplay the recorded demo\033[0m"
+    @echo "  just \033[0;33mdemo-gif\033[0m             \033[0;32mConvert demo to GIF\033[0m"
     @echo ""
     @echo "\033[1;35m📋 Reference:\033[0m"
     @echo "  just \033[0;33m--list\033[0m               \033[0;32mList all available commands\033[0m"

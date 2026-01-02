@@ -345,7 +345,7 @@ fn run_task() -> std::io::Result<()> {
     // Check if tasks directory exists
     if !tasks_dir.exists() {
         eprintln!("Error: .context/tasks/ directory not found.");
-        eprintln!("Run 'cdd' first to initialize the project.");
+        eprintln!("Run 'cdd install' first to initialize the project.");
         process::exit(1);
     }
 
@@ -359,36 +359,63 @@ fn run_task() -> std::io::Result<()> {
         ("Claude Code", "claude")
     } else {
         eprintln!("Error: Neither .claude/commands nor .opencode/command found.");
-        eprintln!("Run 'cdd' first to initialize the project.");
+        eprintln!("Run 'cdd install' first to initialize the project.");
         process::exit(1);
     };
 
-    // Collect all task files
-    let mut task_files: Vec<String> = Vec::new();
-    for entry in fs::read_dir(&tasks_dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.is_file() && path.extension().is_some_and(|ext| ext == "md") {
-            if let Some(file_name) = path.file_name() {
-                task_files.push(file_name.to_string_lossy().to_string());
+    // Collect all task files and directories
+    // Format: (display_name, path, is_directory)
+    let mut task_items: Vec<(String, std::path::PathBuf, bool)> = Vec::new();
+
+    // Recursively collect both directories and files
+    fn collect_items(
+        dir: &std::path::Path,
+        base: &std::path::Path,
+        items: &mut Vec<(String, std::path::PathBuf, bool)>,
+    ) -> std::io::Result<()> {
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+
+            if path.is_dir() {
+                // Add the directory itself as a selectable item
+                if let Ok(rel_path) = path.strip_prefix(base) {
+                    let display_name = format!("📁 {}/", rel_path.display());
+                    items.push((display_name, path.clone(), true));
+                }
+                // Recurse into subdirectories
+                collect_items(&path, base, items)?;
+            } else if path.is_file() && path.extension().is_some_and(|ext| ext == "md") {
+                // Add markdown files
+                if let Ok(rel_path) = path.strip_prefix(base) {
+                    let display_name = rel_path.display().to_string();
+                    items.push((display_name, path, false));
+                }
             }
         }
+        Ok(())
     }
 
-    if task_files.is_empty() {
+    collect_items(&tasks_dir, &tasks_dir, &mut task_items)?;
+
+    if task_items.is_empty() {
         println!("No tasks found in .context/tasks/");
         println!("Tasks will appear here after you create them.");
         return Ok(());
     }
 
-    // Sort task files
-    task_files.sort();
+    // Sort: directories first, then files, both alphabetically
+    task_items.sort_by(|a, b| {
+        match (a.2, b.2) {
+            (true, false) => std::cmp::Ordering::Less, // directories before files
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => a.0.cmp(&b.0), // alphabetical within same type
+        }
+    });
 
-    // Create input for skim
-    let input = task_files.join(
-        "
-",
-    );
+    // Create input for skim (just the display names)
+    let display_names: Vec<String> = task_items.iter().map(|(name, _, _)| name.clone()).collect();
+    let input = display_names.join("\n");
 
     // Get absolute path to tasks directory for preview
     let tasks_dir_abs = tasks_dir.canonicalize().unwrap_or(tasks_dir.clone());
@@ -423,31 +450,81 @@ fn run_task() -> std::io::Result<()> {
     match selected_items {
         Some(out) if !out.is_abort => {
             if let Some(item) = out.selected_items.first() {
-                let selected_file = item.output().to_string();
-                let task_path = tasks_dir.join(&selected_file);
+                let selected_display_name = item.output().to_string();
 
-                // Read task content
-                let task_content = match fs::read_to_string(&task_path) {
-                    Ok(content) => content,
-                    Err(e) => {
-                        eprintln!("Error reading task file: {}", e);
-                        process::exit(1);
+                // Find the corresponding item
+                let selected_item = task_items
+                    .iter()
+                    .find(|(name, _, _)| name == &selected_display_name);
+
+                let (task_content, display_info) = if let Some((_, path, is_dir)) = selected_item {
+                    if *is_dir {
+                        // Directory selected - load ALL tasks in this directory
+                        let mut combined_content = String::new();
+                        let mut task_count = 0;
+
+                        // Collect all markdown files in this directory recursively
+                        fn collect_dir_tasks(
+                            dir: &std::path::Path,
+                            content: &mut String,
+                            count: &mut usize,
+                        ) -> std::io::Result<()> {
+                            for entry in fs::read_dir(dir)? {
+                                let entry = entry?;
+                                let entry_path = entry.path();
+                                if entry_path.is_dir() {
+                                    collect_dir_tasks(&entry_path, content, count)?;
+                                } else if entry_path.is_file()
+                                    && entry_path.extension().is_some_and(|ext| ext == "md")
+                                {
+                                    if let Ok(file_content) = fs::read_to_string(&entry_path) {
+                                        if *count > 0 {
+                                            content.push_str("\n\n---\n\n");
+                                        }
+                                        content.push_str(&format!(
+                                            "## File: {}\n\n{}",
+                                            entry_path.display(),
+                                            file_content
+                                        ));
+                                        *count += 1;
+                                    }
+                                }
+                            }
+                            Ok(())
+                        }
+
+                        if let Err(e) =
+                            collect_dir_tasks(path, &mut combined_content, &mut task_count)
+                        {
+                            eprintln!("Error reading directory tasks: {}", e);
+                            process::exit(1);
+                        }
+
+                        let info = format!("{} ({} tasks)", selected_display_name, task_count);
+                        (combined_content, info)
+                    } else {
+                        // Single file selected
+                        match fs::read_to_string(path) {
+                            Ok(content) => (content, selected_display_name.clone()),
+                            Err(e) => {
+                                eprintln!("Error reading task file: {}", e);
+                                process::exit(1);
+                            }
+                        }
                     }
+                } else {
+                    eprintln!("Error: Selected item not found");
+                    process::exit(1);
                 };
 
                 // Create the prompt with task content
-                let prompt = format!(
-                    "I want to work on this task:\n\nFile: {}\n\n{}",
-                    task_path.display(),
-                    task_content
-                );
+                let prompt = format!("I want to work on this task:\n\n{}", task_content);
 
                 // Launch the appropriate tool with prompt
                 println!(
                     "\n🚀 Launching {} with task: {}",
-                    profile_name, selected_file
+                    profile_name, display_info
                 );
-                println!("💡 Task file: {}", task_path.display());
                 println!();
 
                 // Different invocation for opencode vs claude

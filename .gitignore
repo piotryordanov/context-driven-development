@@ -3,3 +3,8 @@ target
 # Directories created by cdd install
 .claude/
 .opencode/
+
+# Demo recordings (keep scripts, ignore media files)
+demo/*.cast
+demo/*.gif
+demo/*.mp4
