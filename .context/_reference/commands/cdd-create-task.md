@@ -123,7 +123,24 @@ project/
      - **Goals**: 3 specific, measurable outcomes (If you can infer from conversation, propose them)
    - Keep questions minimal - infer as much as possible from the initial conversation
 
-5. **Generate Task File**:
+5. **Final Context Gathering**:
+   - After ALL questions have been asked and answered, ask:
+     ```
+     **Before I create the task:** Is there any additional context, constraints, or requirements you'd like to add?
+     
+     You can share:
+     - Technical constraints or dependencies
+     - Related tasks or background information
+     - Edge cases to consider
+     - Anything else that would help with implementation
+     
+     Reply with your additional context, or "no" / "none" to proceed with task creation.
+     ```
+   - Wait for user response
+   - If user provides additional context, incorporate it into the appropriate sections (Summary, Goals, or add a new "Additional Context" section)
+   - If user says "no", "none", "nope", or similar, proceed to generate the task file
+
+6. **Generate Task File**:
    - **File Name**: `TASK_XXX-brief-description.md` (e.g., `TASK_001-add-user-auth.md`)
    - Proper frontmatter with task_id (auto-incremented), title, project, created date (today)
    - Summary section
@@ -131,8 +148,9 @@ project/
    - File System Diff (showing expected file changes with tree structure)
    - Lessons Learned section (EMPTY - will be filled after implementation)
    - Validation section (must include `just dev` and `just test` commands)
+   - **If additional context was provided**: Incorporate it into relevant sections or create an "Additional Context" section
 
-6. **Save Location**: Save all task files to `.context/tasks/`
+7. **Save Location**: Save all task files to `.context/tasks/`
    - Pattern: `.context/tasks/TASK_{id}-{slug}.md`
    - Example: `.context/tasks/TASK_001-add-user-auth.md`
    - The `.context/tasks/` directory is created during CDD initialization
@@ -159,16 +177,54 @@ You can reply with: option letter (e.g., "B"), "yes"/"recommended" to accept, or
 ```
 
 **Examples:**
-- `**Question [1/3]**: What is the task title?`
-- `**Question [2/3]**: Which project does this belong to?`
-- `**Question [3/3]**: Does this summary capture the task correctly: "<proposed summary>"?`
+
+Basic question:
+```
+**Question [1/3]**: What is the task title?
+
+**Recommended:** Option A - Based on our conversation about user authentication
+
+| Option | Description |
+|--------|-------------|
+| A | Add User Authentication |
+| B | Implement Login System |
+| C | User Auth Module |
+| Short | Provide different title (≤5 words) |
+
+You can reply with: option letter (e.g., "B"), "yes"/"recommended" to accept, or your own short answer.
+```
+
+User response examples:
+- `"A"` → Use option A
+- `"yes"` → Use recommended option (A)
+- `"B"` → Use option B
+- `"JWT-based auth"` → Use custom answer
+
+Final context gathering (AFTER all questions):
+```
+**Before I create the task:** Is there any additional context, constraints, or requirements you'd like to add?
+
+You can share:
+- Technical constraints or dependencies
+- Related tasks or background information
+- Edge cases to consider
+- Anything else that would help with implementation
+
+Reply with your additional context, or "no" / "none" to proceed with task creation.
+```
+
+User can provide:
+- Technical details: `"Need to support PostgreSQL and MySQL, use bcrypt for passwords"`
+- Dependencies: `"This depends on TASK_002 completing first"`
+- Constraints: `"Must work with existing session management system"`
+- Or skip: `"no"`, `"none"`, `"nope"`
 
 **Response Parsing Rules:**
 
 - `"yes"`, `"recommended"`, `"suggested"` → Use recommended option
 - Option letter (A, B, C, etc.) → Use that option
 - Short answer → Use that answer
-- `"done"`, `"good"`, `"no more"` → Stop asking questions
+- `"done"`, `"good"`, `"no more"` → Stop asking questions and proceed to final context gathering
 
 **Best Practices:**
 
@@ -178,7 +234,8 @@ You can reply with: option letter (e.g., "B"), "yes"/"recommended" to accept, or
 - Provide smart defaults as "Recommended" with reasoning
 - Offer clear options in table format
 - Allow short custom answers for flexibility
-- Collect all answers before taking action
-- Stop early if user says "done", "good", or "no more"
+- Collect all answers before proceeding to final context gathering
+- Stop early if user says "done", "good", or "no more" → Then ask for additional context
+- **After all questions**: Always ask the final context gathering question before generating the task
 
 This format ensures consistent, efficient user interaction across all creator and interview-style skills
